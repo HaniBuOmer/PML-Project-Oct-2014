@@ -1,6 +1,6 @@
 
-# Practical Machine Learning - Assesment Writeup
-# =========================================
+# Practical Machine Learning - Prediction Assignment Writeup
+# =============================================
 By hani1986ye on Oct 25, 2014
 
 ## Background
