@@ -1,0 +1,105 @@
+
+# Practical Machine Learning - Assesment Writeup
+# =========================================
+By hani1986ye on Oct 25, 2014
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, my goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. I may use any of the other variables to predict with. I should create a report describing how I built my model, how I used cross validation, what I think the expected out of sample error is, and why I made the choices I did. I will also use my prediction model to predict 20 different test cases. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## ===============================================
+
+## My work
+
+We analyzed the data to determine what activity an individual perform. We used "caret" and "randomForest" packages to allowe me to generate correct answers for each of the 20 test data cases provided in this project. We also made use of a "seed" value for consistent results.
+
+```{r}
+library(Hmisc)
+library(caret)
+library(randomForest)
+library(foreach)
+library(doParallel)
+set.seed(2048)
+options(warn=-1)
+```
+
+Here we loaded the data from the training data and test data provided in the project web page. Some values contained a "#DIV/0!" so we replaced with an "NA" value.
+
+```{r}
+training_data <- read.csv("pml-training.csv", na.strings=c("#DIV/0!") )
+test_data <- read.csv("pml-testing.csv", na.strings=c("#DIV/0!") )
+```
+
+We also casted all columns 8 to the end to be numeric.
+
+```{r}
+for(i in c(8:ncol(training_data)-1)) {training_data[,i] = as.numeric(as.character(training_data[,i]))}
+
+for(i in c(8:ncol(test_data)-1)) {test_data[,i] = as.numeric(as.character(test_data[,i]))}
+```
+
+Some columns were mostly blank.  These columns did not contribute well to the prediction.  So we chose a feature set that only included complete columns. We also removed user name, timestamps and windows.  
+
+### Determining and displaying feature set:
+
+```{r}
+feature_set <- colnames(training_data[colSums(is.na(training_data)) == 0])[-(1:7)]
+model_data <- training_data[feature_set]
+feature_set
+```
+
+Now we have the model data built from our feature set:
+
+```{r}
+idx <- createDataPartition(y=model_data$classe, p=0.75, list=FALSE )
+training <- model_data[idx,]
+testing <- model_data[-idx,]
+```
+
+We now built 5 random forests with 150 trees each. We used "parallel processing" to build our model.
+
+```{r}
+registerDoParallel()
+x <- training[-ncol(training)]
+y <- training$classe
+
+rf <- foreach(ntree=rep(150, 6), .combine=randomForest::combine, .packages='randomForest') %dopar% {
+randomForest(x, y, ntree=ntree) 
+}
+```
+
+### Providing error reports for both training and test data:
+
+```{r}
+predictions1 <- predict(rf, newdata=training)
+confusionMatrix(predictions1,training$classe)
+
+predictions2 <- predict(rf, newdata=testing)
+confusionMatrix(predictions2,testing$classe)
+```
+
+## Conclusions and Answers Submition
+   ---------------------------------
+
+We can see from the confusion matrix that this model is very accurate. We did experiment with PCA and other models, but did not get as good of accuracy. Because our test data were around 99% accurate, we expected nearly all of the submitted test cases to be correct.  It turned out they were all correct.
+
+
+### Preparing the submission (using the provided code in the course website)
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+x <- test_data
+x <- x[feature_set[feature_set!='classe']]
+answers <- predict(rf, newdata=x)
+
+answers
+
+pml_write_files(answers)
+```
